@@ -14,7 +14,7 @@ image:
 namespaceOverride: ""
 
 # The user should provide their credentials to pull the graph service docker image
-#imagePullSecrets:
+# imagePullSecrets:
 #  - name: regcred
 
 
@@ -105,9 +105,9 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
-#env:
+# env:
 #  - name: aerospike.client.host
-#    value: 
+#    value:
 #  - name: aerospike.client.port
 #    value: "3000"
 #  - name: aerospike.client.namespace

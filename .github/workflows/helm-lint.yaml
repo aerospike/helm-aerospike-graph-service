@@ -31,3 +31,7 @@ jobs:
         run: |
           cd charts/aerospike-graph-service
           ct lint --chart-dirs . --charts .
+
+      - name: Helm template test
+        run: |
+          helm template charts/aerospike-graph-service --debug --values charts/aerospike-graph-service/values.yaml
