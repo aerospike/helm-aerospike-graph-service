@@ -82,88 +82,9 @@ jobs:
           jf rt build-add-git "${{env.CHART_NAME}}-helm" "${{needs.setup.outputs.chart_version}}"
           jf rt build-publish "${{env.CHART_NAME}}-helm" "${{needs.setup.outputs.chart_version}}" --project="${{env.JF_PROJECT}}"                  
 
-  build-init-container:
-    needs:
-      - setup
-    runs-on: ubuntu-latest
-    steps:
-      - name: 'Git checkout'
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 #  v3.6.0
-        with:
-          platforms: all
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 #  v3.10.0
-
-      - name: setup jfrog
-        uses: jfrog/setup-jfrog-cli@f748a0599171a192a2668afee8d0497f7c1069df #  v4.5.6
-        env:
-          JF_URL: https://aerospike.jfrog.io
-          JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
-          JF_PROJECT: ${{ env.JF_PROJECT }}
-
-      - name: Login to Artifact Aerospike Docker Registry
-        run: |
-          jf docker login artifact.aerospike.io --username ${{ vars.JF_USERNAME }} --password ${{ secrets.JF_ACCESS_TOKEN }}
-        env:
-          JFROG_CLI_OFFER_CONFIG: 'false'
-      - name: Configure JFrog CLI
-        run: |
-          jf c add \
-            --url https://artifact.aerospike.io/ \
-            --user ${{ vars.JF_USERNAME }} \
-            --access-token ${{ secrets.JF_ACCESS_TOKEN }} \
-            artifact
-
-          jf c use artifact
-        env:
-          JFROG_CLI_OFFER_CONFIG: 'false'
-
-      # Init container uses chart's version
-      - name: Build and Push Docker Image
-        run: |
-          jf docker buildx bake \
-            --set avs-init-container.tags=artifact.aerospike.io/${{ env.JF_PROJECT }}-container-dev-local/avs-init-container:${{ needs.setup.outputs.chart_version }} \
-            --file avs-init-container/bake.hcl \
-            --push \
-            --metadata-file=build-metadata
-        env:
-          DOCKER_BUILDKIT: '1'
-
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      - name: Extract Image Name and Digest
-        run: |
-          jq -r '.[] | {digest: .["containerimage.digest"], names: .["image.name"] | split(",")} | "(.digest)"' build-metadata > sha
-          echo artifact.aerospike.io/${{ env.JF_PROJECT }}-container-dev-local/avs-init-container:${{ needs.setup.outputs.chart_version }}@$(cat sha) > meta-info
-          echo artifact.aerospike.io/${{ env.JF_PROJECT }}-container-dev-local/avs-init-container:${{ needs.setup.outputs.chart_version }}@$(cat sha) > meta-info-latest
-      - name: Create Docker Build Info
-        run: |
-          jf rt build-docker-create \
-            --build-name "avs-init-container" \
-            --build-number "${{ needs.setup.outputs.chart_version }}" \
-            --image-file ./meta-info \
-            --project ${{env.JF_PROJECT}} \
-            ${{env.JF_PROJECT}}-container-dev-local
-
-      - name: Publish Build Info
-        run: |
-          export JFROG_CLI_LOG_LEVEL=DEBUG 
-          jf rt build-collect-env --project ${{env.JF_PROJECT}} "avs-init-container" "${{ needs.setup.outputs.chart_version }}"  
-          jf rt build-add-git --project ${{env.JF_PROJECT}} "avs-init-container" "${{ needs.setup.outputs.chart_version }}" 
-
-          jf rt build-publish \
-            --detailed-summary \
-            --project ${{env.JF_PROJECT}} \
-            "avs-init-container" "${{ needs.setup.outputs.chart_version }}"
   create-release-bundle:
     needs:
       - build-chart
-      - build-init-container
       - setup
     runs-on: ubuntu-latest
     steps:
@@ -184,10 +105,6 @@ jobs:
                 "project": "${{ env.JF_PROJECT }}",
                 "build": "${{ env.CHART_NAME }}-helm/${{ needs.setup.outputs.chart_version }}"
           
-              },
-              {
-                "project": "${{ env.JF_PROJECT }}",
-                "build": "avs-init-container/${{ needs.setup.outputs.chart_version }}"
               }
             ]
           }' > release-bundle-spec.json

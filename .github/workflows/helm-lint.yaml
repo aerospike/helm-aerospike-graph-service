@@ -62,6 +62,10 @@ jobs:
               --set env[0].name=aerospike.client.host \
               --set env[0].value="aerospike-inside"
           
+          # sleep 30 seconds
+          sleep 30
+          pod=$(kubectl get pods -l app.kubernetes.io/name=aerospike-graph -o jsonpath="{.items[0].metadata.name}")
+          kubectl logs "$pod"
           
           # Wait for the deployment to be ready.
           kubectl wait --for=condition=available deployment/ags-aerospike-graph --timeout=30s
