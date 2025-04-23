@@ -64,4 +64,4 @@ jobs:
           
           
           # Wait for the deployment to be ready.
-          kubectl wait --for=condition=available deployment/aerospike-graph --timeout=30s
+          kubectl wait --for=condition=available deployment/ags-aerospike-graph --timeout=30s
