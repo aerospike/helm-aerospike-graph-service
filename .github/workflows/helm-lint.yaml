@@ -1,4 +1,4 @@
-name: Lint
+name: Test Helm Chart
 
 permissions:
   contents: read
@@ -25,13 +25,6 @@ jobs:
         with:
           version: latest
 
-      - uses: azure/setup-kubectl@v4
-        id: install
-
-      - name: Setup Minikube
-        id: minikube
-        uses: medyagh/setup-minikube@latest
-
       - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
         with:
           python-version: '3.x'
@@ -49,6 +42,13 @@ jobs:
         run: |
           helm template charts/aerospike-graph-service --debug --values charts/aerospike-graph-service/values.yaml
 
+      - uses: azure/setup-kubectl@v4
+        id: install
+
+      - name: Setup Minikube
+        id: minikube
+        uses: medyagh/setup-minikube@latest
+
       - name: Test full deployment
         run: |
           # Start Aerospike in a pod.
@@ -58,7 +58,7 @@ jobs:
           kubectl wait --for=condition=ready pod/aerospike-inside --timeout=30s
           
           # Install aerospike-graph-service.
-          helm install ags charts/aerospike-graph-service \ 
+          helm install ags charts/aerospike-graph-service \
               --set env[0].name=aerospike.client.host \
               --set env[0].value="aerospike-inside"
           
