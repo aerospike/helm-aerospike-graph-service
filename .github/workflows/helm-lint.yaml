@@ -11,7 +11,8 @@ on:
     branches: [main]
 
 jobs:
-  lint:
+  lint-test:
+    name: Build and Test Helm Chart
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -55,17 +56,12 @@ jobs:
           kubectl run aerospike-inside --image=aerospike:ee-7.2.0.1   --port=3000   --expose   -- bash -c "asd --foreground"
           
           # Wait for Aerospike to be ready.
-          kubectl wait --for=condition=ready pod/aerospike-inside --timeout=30s
+          kubectl wait --for=condition=ready pod/aerospike-inside --timeout=60s
           
           # Install aerospike-graph-service.
           helm install ags charts/aerospike-graph-service \
               --set env[0].name=aerospike.client.host \
               --set env[0].value="aerospike-inside"
           
-          # sleep 30 seconds
-          sleep 30
-          pod=$(kubectl get pods -l app.kubernetes.io/name=aerospike-graph -o jsonpath="{.items[0].metadata.name}")
-          kubectl logs "$pod"
-          
           # Wait for the deployment to be ready.
-          kubectl wait --for=condition=available deployment/ags-aerospike-graph --timeout=30s
+          kubectl wait --for=condition=available deployment/ags-aerospike-graph --timeout=60s
