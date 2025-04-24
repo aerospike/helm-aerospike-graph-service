@@ -1,0 +1,67 @@
+name: Test Helm Chart
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-test:
+    name: Build and Test Helm Chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Install Helm, Kubectl, and Minikube
+      - name: Set up Helm
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112
+        with:
+          version: latest
+
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5.5.0
+        with:
+          python-version: '3.x'
+          check-latest: true
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@0d28d3144d3a25ea2cc349d6e59901c4ff469b3b
+
+      - name: Run chart-testing (lint)
+        run: |
+          cd charts/aerospike-graph-service
+          ct lint --chart-dirs . --charts .
+
+      - name: Helm template test
+        run: |
+          helm template charts/aerospike-graph-service --debug --values charts/aerospike-graph-service/values.yaml
+
+      - uses: azure/setup-kubectl@v4
+        id: install
+
+      - name: Setup Minikube
+        id: minikube
+        uses: medyagh/setup-minikube@latest
+
+      - name: Test full deployment
+        run: |
+          # Start Aerospike in a pod.
+          kubectl run aerospike-inside --image=aerospike:ee-7.2.0.1   --port=3000   --expose   -- bash -c "asd --foreground"
+          
+          # Wait for Aerospike to be ready.
+          kubectl wait --for=condition=ready pod/aerospike-inside --timeout=60s
+          
+          # Install aerospike-graph-service.
+          helm install ags charts/aerospike-graph-service \
+              --set env[0].name=aerospike.client.host \
+              --set env[0].value="aerospike-inside"
+          
+          # Wait for the deployment to be ready.
+          kubectl wait --for=condition=available deployment/ags-aerospike-graph --timeout=60s

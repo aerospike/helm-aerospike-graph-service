@@ -1,0 +1,113 @@
+name: Build and Bundle Jfrog Helm chart
+permissions:
+  contents: read
+  pull-requests: write
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      chart_version:
+        description: 'Build number to use for the build metadata'
+        required: true
+        default: '0.0.0'
+env:
+  JF_PROJECT: ecosystem
+  JF_REPO: ecosystem-helm-dev-local
+  CHART_NAME: 'aerospike-graph-service'
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      chart_version: ${{ steps.version.outputs.chart_version }}
+    steps:
+      - name: Determine Version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            CHART_VERSION=${{ github.event.inputs.chart_version }}
+          elif [[ "${{ github.event_name}}" == "push" ]]; then
+            TAG=${GITHUB_REF#refs/tags/} 
+              # Remove "v" prefix to get the version
+            CHART_VERSION=${TAG#v}
+          else
+            echo "Unable to determine version"
+            exit 1
+          fi
+          echo "CHART_VERSION=${CHART_VERSION}" >> $GITHUB_ENV
+          echo "chart_version=${CHART_VERSION}" >> $GITHUB_OUTPUT
+
+  build-chart:
+    runs-on: ubuntu-22.04
+    needs: setup
+    steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+
+
+      - name: setup GPG
+        uses: aerospike/shared-workflows/.github/actions/setup-gpg@dda8173aca1f1e73f95267572a7d3849cd00f1b8
+        with:
+          gpg-private-key: ${{ secrets.GPG_SECRET_KEY }}
+          gpg-public-key: ${{ secrets.GPG_PUBLIC_KEY }}
+          gpg-key-pass: ${{ secrets.GPG_PASS }}
+
+      - name: setup jfrog
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: https://aerospike.jfrog.io
+          JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
+          JF_PROJECT: ${{ env.JF_PROJECT }}
+
+      - name: Set Helm Chart Version
+        uses: mikefarah/yq@8bf425b4d1344db7cd469a8d10a390876e0c77fd
+        with:
+          cmd: yq e -i '.version = "${{ needs.setup.outputs.chart_version }}"' charts/$CHART_NAME/Chart.yaml
+      - name: "Sign and publish build to JFrog"
+        env:
+          GPG_TTY: no-tty
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASS }}
+        run: |
+          cd charts
+          
+          gpg --export --no-tty  --passphrase "$GPG_PASSPHRASE" > ~/.gnupg/pubring.gpg
+          gpg --export-secret-keys --no-tty  --passphrase "$GPG_PASSPHRASE">~/.gnupg/secring.gpg
+          echo $GPG_PASSPHRASE > passphrase.txt
+          helm --sign --key='aerospike-inc' --keyring='/home/runner/.gnupg/secring.gpg' --passphrase-file passphrase.txt  package $CHART_NAME
+          find .
+          jf rt u "${{env.CHART_NAME}}-${{needs.setup.outputs.chart_version}}.tgz*" "${{env.JF_REPO}}/${{env.CHART_NAME}}/${{needs.setup.outputs.chart_version}}/" \
+          --build-name="${{env.CHART_NAME}}-helm" --build-number="${{needs.setup.outputs.chart_version}}" --project="${{env.JF_PROJECT}}"
+          jf rt build-collect-env "${{env.CHART_NAME}}-helm" "${{needs.setup.outputs.chart_version}}"
+          jf rt build-add-git "${{env.CHART_NAME}}-helm" "${{needs.setup.outputs.chart_version}}"
+          jf rt build-publish "${{env.CHART_NAME}}-helm" "${{needs.setup.outputs.chart_version}}" --project="${{env.JF_PROJECT}}"                  
+
+  create-release-bundle:
+    needs:
+      - build-chart
+      - setup
+    runs-on: ubuntu-latest
+    steps:
+      - name: setup jfrog
+        uses: jfrog/setup-jfrog-cli@f748a0599171a192a2668afee8d0497f7c1069df #  v4.5.6
+        env:
+          JF_URL: https://aerospike.jfrog.io
+          JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
+          JF_PROJECT: ${{ env.JF_PROJECT }}
+      - name: Create release bundle
+        run: |
+          echo '{
+          
+            "name": "${{ env.CHART_NAME }}-helm",
+            "version": "${{ needs.setup.outputs.chart_version }}",
+            "files": [
+              {
+                "project": "${{ env.JF_PROJECT }}",
+                "build": "${{ env.CHART_NAME }}-helm/${{ needs.setup.outputs.chart_version }}"
+          
+              }
+            ]
+          }' > release-bundle-spec.json
+          cat release-bundle-spec.json
+          jf release-bundle-create "${{ env.CHART_NAME }}-helm" "${{ needs.setup.outputs.chart_version }}" \
+            --spec release-bundle-spec.json --project="${{ env.JF_PROJECT }}" --signing-key="aerospike"
