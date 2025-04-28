@@ -112,9 +112,9 @@ jobs:
         uses: jfrog/setup-jfrog-cli@v4
         env:
           JF_URL: https://aerospike.jfrog.io
-          JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
-          JF_PROJECT: ${{ env.JF_PROJECT }}
-
+        with:
+          oidc-provider-name: gh-aerospike
+          oidc-audience: aerospike
       - name: Set Helm Chart Version
         uses: mikefarah/yq@8bf425b4d1344db7cd469a8d10a390876e0c77fd
         with:
