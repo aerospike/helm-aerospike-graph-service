@@ -36,12 +36,12 @@ jobs:
 
       - name: Run chart-testing (lint)
         run: |
-          cd charts/aerospike-graph-service
+          cd charts/aerospike-graph
           ct lint --chart-dirs . --charts .
 
       - name: Helm template test
         run: |
-          helm template charts/aerospike-graph-service --debug --values charts/aerospike-graph-service/values.yaml
+          helm template charts/aerospike-graph --debug --values charts/aerospike-graph/values.yaml
 
       - uses: azure/setup-kubectl@v4
         id: install
@@ -58,8 +58,8 @@ jobs:
           # Wait for Aerospike to be ready.
           kubectl wait --for=condition=ready pod/aerospike-inside --timeout=60s
           
-          # Install aerospike-graph-service.
-          helm install ags charts/aerospike-graph-service \
+          # Install aerospike-graph.
+          helm install ags charts/aerospike-graph \
               --set env[0].name=aerospike.client.host \
               --set env[0].value="aerospike-inside"
           
