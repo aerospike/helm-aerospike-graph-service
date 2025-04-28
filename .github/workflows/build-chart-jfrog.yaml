@@ -1,7 +1,9 @@
 name: Build and Bundle Jfrog Helm chart
 permissions:
+  id-token: write
   contents: read
   pull-requests: write
+
 on:
   push:
     tags:
@@ -12,10 +14,12 @@ on:
         description: 'Build number to use for the build metadata'
         required: true
         default: '0.0.0'
+
 env:
   JF_PROJECT: ecosystem
   JF_REPO: ecosystem-helm-dev-local
   CHART_NAME: 'aerospike-graph-service'
+
 jobs:
   test:
     name: Build and Test Helm Chart
