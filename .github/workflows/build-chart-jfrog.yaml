@@ -148,11 +148,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: setup jfrog
-        uses: jfrog/setup-jfrog-cli@f748a0599171a192a2668afee8d0497f7c1069df #  v4.5.6
+        uses: jfrog/setup-jfrog-cli@v4
         env:
           JF_URL: https://aerospike.jfrog.io
-          JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
-          JF_PROJECT: ${{ env.JF_PROJECT }}
+        with:
+          oidc-provider-name: gh-aerospike
+          oidc-audience: aerospike
       - name: Create release bundle
         run: |
           echo '{
