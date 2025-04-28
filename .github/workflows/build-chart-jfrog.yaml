@@ -18,7 +18,7 @@ on:
 env:
   JF_PROJECT: ecosystem
   JF_REPO: ecosystem-helm-dev-local
-  CHART_NAME: 'aerospike-graph-service'
+  CHART_NAME: 'aerospike-graph'
 
 jobs:
   test:
