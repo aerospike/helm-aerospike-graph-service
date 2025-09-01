@@ -24,7 +24,9 @@ follows:
 ```bash noCopy
 $ helm [INSTALL|UPGRADE] [RELEASE-NAME] aerospike/aerospike-graph \
     --set 'env[0].name=[GRAPH-CONFIG-NAME]' \
+    --set 'env[0].value=[GRAPH-CONFIG-VALUE]' \
     --set 'env[1].name=[GRAPH-CONFIG-NAME]' \
+    --set 'env[1].value=[GRAPH-CONFIG-VALUE]' \
     ...
 ```
 All the [configuration options](https://aerospike.com/docs/graph/configuring/options)
